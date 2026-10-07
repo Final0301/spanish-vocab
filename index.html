@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="西语单词">
+<title>西语单词</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f6f8;color:#202124;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",Arial,sans-serif}
+.app{max-width:720px;margin:auto;padding:18px 16px 40px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+h1{font-size:25px;margin:0 0 4px}.sub{color:#777;font-size:13px}
+.card{background:#fff;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 1px 5px #0000000d}
+label{display:block;font-size:14px;font-weight:600;margin:10px 0 7px}
+input,textarea,select{width:100%;border:1px solid #ddd;border-radius:11px;padding:12px;font-size:16px;background:#fff}
+textarea{min-height:170px;resize:vertical}
+button{border:0;border-radius:11px;padding:12px 14px;font-size:15px;font-weight:600;background:#222;color:#fff}
+button.secondary{background:#eef0f3;color:#222}button.danger{background:#fff0f0;color:#b00020}
+button:disabled{opacity:.45}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}
+.tabs{display:flex;gap:8px;margin:10px 0}.tabs button{flex:1}
+.mode{font-size:13px;color:#777;margin-bottom:8px}.q{font-size:25px;font-weight:700;margin:18px 0;text-align:center;word-break:break-word}
+.options{display:grid;gap:10px}.option{background:#fff;border:1px solid #ddd;color:#222;text-align:left;font-weight:500}.option.correct{border-color:#198754;background:#eaf7ef}.option.wrong{border-color:#d33;background:#fff0f0}
+.center{text-align:center}.score{font-size:14px;color:#666;margin:12px 0}.unit{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #eee}.unit:last-child{border-bottom:0}
+.small{font-size:12px;color:#888}.hidden{display:none!important}.notice{padding:11px;border-radius:10px;background:#f1f5ff;color:#3157a5;font-size:13px;margin-top:10px}
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{background:#f7f7f8;border-radius:12px;padding:12px;text-align:center}.num{font-size:22px;font-weight:700}.muted{color:#777}
+hr{border:0;border-top:1px solid #eee;margin:16px 0}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div><h1>西语单词</h1><div class="sub">长期使用版 · 可备份 / 恢复</div></div>
+  </div>
+
+  <div class="card">
+    <label>选择单元</label>
+    <select id="unitSelect"></select>
+    <div class="tabs">
+      <button id="es2zh">西语 → 中文</button>
+      <button id="zh2es" class="secondary">中文 → 西语</button>
+    </div>
+    <button id="startBtn" style="width:100%">开始背词</button>
+    <div class="small" style="margin-top:8px">题目和选项会随机排列，错题会自动记录。</div>
+  </div>
+
+  <div id="quizCard" class="card hidden">
+    <div class="mode" id="modeText"></div>
+    <div class="q" id="question"></div>
+    <div class="options" id="options"></div>
+    <div class="score" id="score"></div>
+    <button id="nextBtn" class="secondary hidden" style="width:100%">下一题</button>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px">词库管理</h3>
+    <div class="row">
+      <button id="addUnit">添加 / 导入单元</button>
+      <button id="wrongBtn" class="secondary">只练错题</button>
+    </div>
+    <div id="unitList"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px">数据备份</h3>
+    <div class="statgrid">
+      <div class="stat"><div class="num" id="unitCount">0</div><div class="small">单元</div></div>
+      <div class="stat"><div class="num" id="wordCount">0</div><div class="small">单词</div></div>
+      <div class="stat"><div class="num" id="wrongCount">0</div><div class="small">错词</div></div>
+    </div>
+    <hr>
+    <div class="row">
+      <button id="exportBtn">导出备份</button>
+      <button id="importBtn" class="secondary">恢复备份</button>
+    </div>
+    <input id="fileInput" type="file" accept=".json,application/json" class="hidden">
+    <div class="notice">
+      建议：每添加完一个或几个单元，就点一次“导出备份”，把 JSON 文件存到“文件”App、iCloud Drive 或电脑里。换手机时也能恢复。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 8px">使用说明</h3>
+    <div class="small" style="line-height:1.8">
+      1. 添加单元时，每行一个单词：<br>
+      <b>casa 房子</b><br>
+      <b>estudiar 学习</b><br>
+      2. 可以直接粘贴整单元词表。<br>
+      3. “导出备份”会保存全部单元、错题记录和学习数据。<br>
+      4. 不要清除浏览器网站数据；最稳妥的方法是定期导出备份。
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY="spanish_vocab_longterm_v1";
+let data=JSON.parse(localStorage.getItem(KEY)||'{"units":{},"wrong":{},"stats":{"answered":0,"correct":0}}');
+let currentMode="es2zh", currentUnit="", quiz=[], qi=0, answered=false;
+
+function save(){localStorage.setItem(KEY,JSON.stringify(data));render();}
+function allWords(){
+  let a=[]; Object.entries(data.units).forEach(([u,ws])=>ws.forEach(w=>a.push({...w,unit:u}))); return a;
+}
+function render(){
+  const us=Object.keys(data.units);
+  const sel=document.getElementById("unitSelect");
+  sel.innerHTML='<option value="__all">全部单元</option>'+us.map(u=>`<option>${esc(u)}</option>`).join("");
+  if(currentUnit && (currentUnit==="__all"||data.units[currentUnit])) sel.value=currentUnit;
+  document.getElementById("unitCount").textContent=us.length;
+  document.getElementById("wordCount").textContent=allWords().length;
+  document.getElementById("wrongCount").textContent=Object.keys(data.wrong).length;
+  const list=document.getElementById("unitList");
+  list.innerHTML=us.length?us.map(u=>`<div class="unit"><div><b>${esc(u)}</b><div class="small">${data.units[u].length} 个单词</div></div><button class="danger" onclick="delUnit(${JSON.stringify(u)})">删除</button></div>`).join(""):'<div class="small muted" style="padding:10px 0">还没有词库。</div>';
+}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function addUnit(){
+  const name=prompt("请输入单元名称，例如：Unidad 1");
+  if(!name) return;
+  const raw=prompt("粘贴单词，每行一个：\n西语 中文\n例如：\ncasa 房子\nestudiar 学习");
+  if(!raw) return;
+  const words=[];
+  raw.split(/\n/).forEach(line=>{
+    line=line.trim(); if(!line)return;
+    const m=line.match(/^(\S+)\s+(.+)$/);
+    if(m) words.push({es:m[1].trim(),zh:m[2].trim()});
+  });
+  if(!words.length){alert("没有识别到单词。请确保每行格式为：西语 + 空格/Tab + 中文");return;}
+  data.units[name]=words;
+  save(); currentUnit=name; render(); document.getElementById("unitSelect").value=name;
+  alert(`已添加 ${words.length} 个单词。`);
+}
+function delUnit(u){
+  if(!confirm(`确定删除“${u}”吗？该单元的单词也会删除。`))return;
+  delete data.units[u];
+  save();
+}
+function shuffle(a){return [...a].sort(()=>Math.random()-.5);}
+function startQuiz(wrongOnly=false){
+  currentUnit=document.getElementById("unitSelect").value;
+  let source=currentUnit==="__all"?allWords():(data.units[currentUnit]||[]).map(w=>({...w,unit:currentUnit}));
+  if(wrongOnly) source=source.filter(w=>data.wrong[w.es]);
+  if(source.length<1){alert(wrongOnly?"当前范围没有错题。":"当前单元还没有单词。");return;}
+  quiz=shuffle(source); qi=0; answered=false;
+  document.getElementById("quizCard").classList.remove("hidden");
+  showQ();
+}
+function showQ(){
+  answered=false; const w=quiz[qi];
+  document.getElementById("modeText").textContent=currentMode==="es2zh"?"西语 → 中文":"中文 → 西语";
+  document.getElementById("question").textContent=currentMode==="es2zh"?w.es:w.zh;
+  const others=shuffle(allWords().filter(x=>x.es!==w.es)).slice(0,3);
+  const opts=shuffle([w,...others]).map(x=>({x}));
+  document.getElementById("options").innerHTML=opts.map((o,i)=>`<button class="option" data-es="${esc(o.x.es)}">${esc(currentMode==="es2zh"?o.x.zh:o.x.es)}</button>`).join("");
+  document.querySelectorAll(".option").forEach(b=>b.onclick=()=>answer(b,w));
+  document.getElementById("score").textContent=`第 ${qi+1} / ${quiz.length} 题 · 本次正确 ${data.stats.sessionCorrect||0}`;
+  document.getElementById("nextBtn").classList.add("hidden");
+}
+function answer(btn,w){
+  if(answered)return; answered=true;
+  const selected=btn.dataset.es, correct=selected===w.es;
+  document.querySelectorAll(".option").forEach(b=>{
+    if(b.dataset.es===w.es)b.classList.add("correct");
+    if(b===btn&&!correct)b.classList.add("wrong");
+  });
+  data.stats.answered=(data.stats.answered||0)+1;
+  if(correct){data.stats.correct=(data.stats.correct||0)+1; delete data.wrong[w.es];}
+  else data.wrong[w.es]=true;
+  data.stats.sessionCorrect=(data.stats.sessionCorrect||0)+(correct?1:0);
+  localStorage.setItem(KEY,JSON.stringify(data)); render();
+  const nb=document.getElementById("nextBtn"); nb.classList.remove("hidden");
+  nb.textContent=qi===quiz.length-1?"完成":"下一题";
+}
+function next(){if(!answered)return;if(qi<quiz.length-1){qi++;showQ()}else{alert(`完成！本次答对 ${data.stats.sessionCorrect||0} / ${quiz.length}。`);data.stats.sessionCorrect=0;localStorage.setItem(KEY,JSON.stringify(data));document.getElementById("quizCard").classList.add("hidden");}}
+function exportData(){
+  const payload={app:"西语单词长期版",version:1,exportedAt:new Date().toISOString(),data};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download=`西语单词备份_${new Date().toISOString().slice(0,10)}.json`;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function importData(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const p=JSON.parse(r.result), d=p.data||p;
+      if(!d.units||!d.wrong)throw Error();
+      if(!confirm("恢复备份会用备份内容覆盖当前词库。确定继续吗？"))return;
+      data=d; save(); alert("恢复成功！");
+    }catch(e){alert("备份文件无法识别，请选择本程序导出的 JSON 文件。");}
+  };r.readAsText(file);
+}
+document.getElementById("addUnit").onclick=addUnit;
+document.getElementById("startBtn").onclick=()=>startQuiz(false);
+document.getElementById("wrongBtn").onclick=()=>startQuiz(true);
+document.getElementById("nextBtn").onclick=next;
+document.getElementById("es2zh").onclick=()=>{currentMode="es2zh";document.getElementById("es2zh").classList.remove("secondary");document.getElementById("zh2es").classList.add("secondary")};
+document.getElementById("zh2es").onclick=()=>{currentMode="zh2es";document.getElementById("zh2es").classList.remove("secondary");document.getElementById("es2zh").classList.add("secondary")};
+document.getElementById("unitSelect").onchange=e=>currentUnit=e.target.value;
+document.getElementById("exportBtn").onclick=exportData;
+document.getElementById("importBtn").onclick=()=>document.getElementById("fileInput").click();
+document.getElementById("fileInput").onchange=e=>{if(e.target.files[0])importData(e.target.files[0]);e.target.value=""};
+render();
+</script>
+</body>
+</html>
